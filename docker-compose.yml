@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  llm:
+    build:
+      context: ./llm-backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./llm-backend/.env
+    expose:
+      - "8000"
+    networks:
+      - capdbreak-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  fastapi-app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fastapi-app
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      llm:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://capdbreak:capdbreak@postgres-db:5432/capdbreak
+      - LLM_SERVER_URL=http://llm:8000/analyze
+    networks:
+      - capdbreak-network
+    restart: unless-stopped
+
+  postgres-db:
+    image: postgres:15
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: capdbreak
+      POSTGRES_PASSWORD: capdbreak
+      POSTGRES_DB: capdbreak
+    expose:
+      - "5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d
+    networks:
+      - capdbreak-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U capdbreak"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  vite-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vite-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - fastapi-app
+    networks:
+      - capdbreak-network
+    restart: unless-stopped
+
+  news-crawler:
+    build:
+      context: ./Crawling
+      dockerfile: Dockerfile
+    container_name: news-crawler
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      llm:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://capdbreak:capdbreak@postgres-db:5432/capdbreak
+      - LLM_SERVER_URL=http://llm:8000/analyze
+    networks:
+      - capdbreak-network
+    restart: on-failure
+
+volumes:
+  pgdata:
+
+networks:
+  capdbreak-network:
