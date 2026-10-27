@@ -1,5 +1,6 @@
 pandas
 sqlalchemy
+psycopg
 psycopg2-binary
 feedparser
 googlenewsdecoder

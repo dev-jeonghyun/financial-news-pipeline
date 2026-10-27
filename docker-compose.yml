@@ -14,7 +14,7 @@ services:
     networks:
       - capdbreak-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -68,7 +68,7 @@ services:
       dockerfile: Dockerfile
     container_name: vite-frontend
     ports:
-      - "80:80"
+      - "3000:3000"
     depends_on:
       - fastapi-app
     networks:
